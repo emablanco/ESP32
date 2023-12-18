@@ -1,0 +1,152 @@
+#include "configEma.h"
+#include "CTBot.h"
+
+
+template<class T> inline Print &operator <<(Print &obj, T arg) {
+  obj.print(arg);
+  return obj;
+}
+
+
+
+CTBot miBot;
+CTBotInlineKeyboard miTeclado;
+CTBotInlineKeyboard miURL;
+
+int buzzer = 4; //alarma
+int frecuencia = 200; // frecuencia inicial
+int canal = 0; //canal
+int sensor = 2; // pir
+unsigned long tiempo; // tiempo encendido el esp
+bool peligro = false; // se detecto movimiento
+bool alarmaActivada = false; // alarma activada
+
+int contador = 0; //contador de movimientos
+
+bool movimiento(); //busca movimiento
+void alarma(const int &); // cirena
+void alarmaFuncionando(); //usa cirena por 10 segundos
+void mensajesBot(); // mira si hay mensajes en el chat del bot
+
+uint32_t emaID = 5604166531; // id de mi chat
+int64_t grupoID = -4051483549;
+
+void setup(){
+
+  pinMode(sensor,INPUT);
+  ledcSetup(canal,frecuencia,8);
+  ledcAttachPin(buzzer,canal);
+  Serial.begin(115200);
+  Serial.println("Iniciando Bot Telegram...");
+
+  miBot.wifiConnect(ssid, password);
+
+  miBot.setTelegramToken(token);
+
+  if (miBot.testConnection()) {
+    Serial.println("Bot Conectado");
+  }
+  else {
+    Serial.println("Error con Bot");
+  }
+
+  miTeclado.addButton("Encender", "encender", CTBotKeyboardButtonQuery);
+  miTeclado.addButton("Apagar", "apagar", CTBotKeyboardButtonQuery);
+  miTeclado.addRow();
+  miTeclado.addButton("mira documentación", "http://elbirri.duckdns.org:8096", CTBotKeyboardButtonURL);
+  miURL.addButton("Mira la Cam 1", "http://elbirri.duckdns.org:8096", CTBotKeyboardButtonURL);
+
+}
+
+void loop(){
+  
+  mensajesBot();
+
+  delay(250);
+
+  if(alarmaActivada){
+    alarmaFuncionando();
+    //no anda emaID solo el numero
+    miBot.sendMessage(grupoID, "Ver Cam1", miURL);
+
+  }
+}
+
+
+void alarmaFuncionando(){
+    tiempo = millis();
+    if(movimiento()){
+      Serial << ("Mas de 10 movimientos detectados PELIGRO");
+      while(millis() - tiempo < 10000){
+        for(frecuencia ; frecuencia < 2000; frecuencia +=10){
+          alarma(10);
+        }
+        for(frecuencia ; frecuencia > 500; frecuencia -=10){
+          alarma(10);
+        }
+      }
+      peligro = !peligro;
+    }
+}
+
+bool movimiento(){
+  if(digitalRead(sensor) == HIGH){
+    ++contador;
+    if(contador >= 10){
+      peligro = !peligro;
+    }
+  }
+  return peligro;
+}
+
+void alarma(const int &t){
+  ledcWriteTone(canal,frecuencia);
+  ledcWrite(canal,128);
+  delay(t);
+  ledcWrite(canal, 0);
+}
+void mensajesBot(){
+
+  TBMessage msg;
+
+  if (miBot.getNewMessage(msg)){
+
+    if(msg.group.id == grupoID){
+
+    if (msg.messageType == CTBotMessageText) {
+    
+      if (msg.text.equalsIgnoreCase("menu")) {
+        
+        Serial << "Grupo: " <<  msg.group.title;
+        
+        miBot.sendMessage(msg.group.id, "Cambiar estado de la alarma", miTeclado);
+      }
+      
+      else {
+        miBot.sendMessage(msg.group.id, "prueba 'menu'");
+      }
+
+    } else if (msg.messageType == CTBotMessageQuery) {
+    
+      Serial << "Mensaje: " <<  msg.text;
+      
+      if (msg.callbackQueryData.equals("encender")) {
+      
+        Serial << " Encender";
+        
+        alarmaActivada = true;
+        
+        miBot.endQuery(msg.callbackQueryID, "Alarma Encendido", true);
+      
+      } else if (msg.callbackQueryData.equals("apagar")) {
+      
+         Serial << " Apagar Alarma";
+         
+          alarmaActivada = false;
+        
+        miBot.endQuery(msg.callbackQueryID, "Camara apgada");
+      }
+    }
+  }
+}
+}
