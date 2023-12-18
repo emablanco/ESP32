@@ -136,15 +136,16 @@ void mensajesBot(){
         
         alarmaActivada = true;
         
-        miBot.endQuery(msg.callbackQueryID, "Alarma Encendido", true);
-      
+        miBot.sendMessage(grupoID, "Alarma Encendida");
+        //miBot.endQuery(msg.callbackQueryID, "Alarma Encendido", true);
+      //esto es respuesta al preciona el boton en un chat no en un grupo
       } else if (msg.callbackQueryData.equals("apagar")) {
       
          Serial << " Apagar Alarma";
          
           alarmaActivada = false;
-        
-        miBot.endQuery(msg.callbackQueryID, "Camara apgada");
+        miBot.sendMessage(grupoID, "Alarma Apagada");
+        //miBot.endQuery(msg.callbackQueryID, "Camara apgada");
       }
     }
   }
